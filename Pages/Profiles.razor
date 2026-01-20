@@ -1,0 +1,242 @@
+@page "/profiles"
+@inject Ofertum.Renovaciones.Services.PriceProfileStore PriceProfileStore
+@using System.Linq;
+
+<PageTitle>Perfiles de Precios</PageTitle>
+
+<h1>Perfiles de Precios</h1>
+
+@if (showEditor)
+{
+    <h2>@((currentProfile?.Id == null) ? "Nuevo Perfil" : "Editar Perfil")</h2>
+    <div class="form-group">
+        <label for="profileName">Nombre del Perfil:</label>
+        <input id="profileName" class="form-control" @bind="currentProfile!.Name" />
+    </div>
+
+    <h3>Precios</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Precio Antiguo</th>
+                <th>Precio Nuevo</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (editablePriceEntries != null)
+            {
+                @foreach (var priceEntry in editablePriceEntries)
+                {
+                    <tr>
+                        <td><input class="form-control" @bind="priceEntry.Key" /></td>
+                        <td><input class="form-control" @bind="priceEntry.Value" /></td>
+                        <td><button class="btn btn-danger" @onclick="(() => RemovePriceEntry(priceEntry))">Eliminar</button></td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    <button class="btn btn-secondary" @onclick="AddPriceEntry">Añadir Precio</button>
+
+    <button class="btn btn-primary" @onclick="SaveProfile">Guardar</button>
+    <button class="btn btn-secondary" @onclick="CancelEdit">Cancelar</button>
+}
+else
+{
+    <button class="btn btn-success mb-3" @onclick="NewProfile">Nuevo Perfil</button>
+
+    @if (priceProfiles is null)
+    {
+        <p><em>Cargando perfiles...</em></p>
+    }
+    else if (!priceProfiles.Any())
+    {
+        <p>No hay perfiles de precios.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Última Actualización (UTC)</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var profile in priceProfiles)
+                {
+                    <tr>
+                        <td>@profile.Name</td>
+                        <td>@profile.UpdatedAtUtc.ToShortDateString() @profile.UpdatedAtUtc.ToShortTimeString()</td>
+                        <td>
+                            <button class="btn btn-info" @onclick="(() => EditProfile(profile.Id))">Editar</button>
+                            <button class="btn btn-warning" @onclick="(() => ShowCloneDialog(profile.Id))">Clonar</button>
+                            <button class="btn btn-danger" @onclick="(() => ShowDeleteConfirmation(profile.Id))">Eliminar</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (showCloneDialog && profileToCloneId != null)
+    {
+        <div class="mt-4 p-3 border">
+            <h4>Clonar Perfil</h4>
+            <div class="form-group">
+                <label for="newProfileName">Nuevo Nombre para el Perfil:</label>
+                <input id="newProfileName" class="form-control" @bind="newProfileName" />
+            </div>
+            <button class="btn btn-primary" @onclick="CloneProfile">Clonar</button>
+            <button class="btn btn-secondary" @onclick="CancelClone">Cancelar</button>
+        </div>
+    }
+
+    @if (showDeleteConfirmation && profileToDeleteId != null)
+    {
+        <div class="mt-4 p-3 border">
+            <h4>Confirmar Eliminación</h4>
+            <p>¿Está seguro que desea eliminar el perfil "@priceProfiles!.FirstOrDefault(p => p.Id == profileToDeleteId)?.Name"?</p>
+            <button class="btn btn-danger" @onclick="DeleteProfile">Eliminar</button>
+            <button class="btn btn-secondary" @onclick="CancelDelete">Cancelar</button>
+        </div>
+    }
+}
+
+@code {
+    private List<Ofertum.Renovaciones.Models.PriceProfile> priceProfiles { get; set; } = new List<Ofertum.Renovaciones.Models.PriceProfile>();
+    private Ofertum.Renovaciones.Models.PriceProfile? currentProfile;
+    private List<PriceEntryModel>? editablePriceEntries; // For editing prices
+    private bool showEditor = false;
+
+    private bool showCloneDialog = false;
+    private string? profileToCloneId;
+    private string newProfileName = "";
+
+    private bool showDeleteConfirmation = false;
+    private string? profileToDeleteId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfiles();
+    }
+
+    private async Task LoadProfiles()
+    {
+        priceProfiles = await PriceProfileStore.ListAsync();
+    }
+
+    private void NewProfile()
+    {
+        currentProfile = new Ofertum.Renovaciones.Models.PriceProfile { Name = string.Empty, Prices = new Dictionary<string, string>() };
+        editablePriceEntries = new List<PriceEntryModel>();
+        showEditor = true;
+    }
+
+    private async Task EditProfile(string id)
+    {
+        currentProfile = await PriceProfileStore.GetAsync(id);
+        if (currentProfile?.Prices != null)
+        {
+            editablePriceEntries = currentProfile.Prices.Select(p => new PriceEntryModel { Key = p.Key, Value = p.Value }).ToList();
+        }
+        else
+        {
+            editablePriceEntries = new List<PriceEntryModel>();
+        }
+        showEditor = true;
+    }
+
+    private async Task SaveProfile()
+    {
+        if (currentProfile != null && editablePriceEntries != null)
+        {
+            currentProfile.Prices = editablePriceEntries.ToDictionary(p => p.Key, p => p.Value);
+            currentProfile.UpdatedAtUtc = DateTime.UtcNow;
+            await PriceProfileStore.SaveAsync(currentProfile);
+            showEditor = false;
+            await LoadProfiles();
+        }
+    }
+
+    private void CancelEdit()
+    {
+        showEditor = false;
+        currentProfile = null;
+        editablePriceEntries = null;
+    }
+
+    private void AddPriceEntry()
+    {
+        if (editablePriceEntries != null)
+        {
+            editablePriceEntries.Add(new PriceEntryModel { Key = "", Value = "" });
+        }
+    }
+
+    private void RemovePriceEntry(PriceEntryModel entryToRemove)
+    {
+        if (editablePriceEntries != null)
+        {
+            editablePriceEntries.Remove(entryToRemove);
+        }
+    }
+
+    private void ShowCloneDialog(string id)
+    {
+        profileToCloneId = id;
+        newProfileName = priceProfiles.FirstOrDefault(p => p.Id == id)?.Name + " (Copia)" ?? "";
+        showCloneDialog = true;
+    }
+
+    private async Task CloneProfile()
+    {
+        if (profileToCloneId != null && !string.IsNullOrWhiteSpace(newProfileName))
+        {
+            await PriceProfileStore.CloneAsync(profileToCloneId, newProfileName);
+            showCloneDialog = false;
+            profileToCloneId = null;
+            newProfileName = "";
+            await LoadProfiles();
+        }
+    }
+
+    private void CancelClone()
+    {
+        showCloneDialog = false;
+        profileToCloneId = null;
+        newProfileName = "";
+    }
+
+    private void ShowDeleteConfirmation(string id)
+    {
+        profileToDeleteId = id;
+        showDeleteConfirmation = true;
+    }
+
+    private async Task DeleteProfile()
+    {
+        if (profileToDeleteId != null)
+        {
+            await PriceProfileStore.DeleteAsync(profileToDeleteId);
+            showDeleteConfirmation = false;
+            profileToDeleteId = null;
+            await LoadProfiles();
+        }
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirmation = false;
+        profileToDeleteId = null;
+    }
+
+    // Helper class for mutable price entries
+    private class PriceEntryModel
+    {
+        public string Key { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
+}

@@ -1,0 +1,8 @@
+- Stack: ASP.NET Core Blazor Server (.NET), ClosedXML para Excel, JSON en disco (sin base de datos).
+- No usar Entity Framework ni SQLite.
+- Todo dato persistente: ficheros JSON en App_Data/price-profiles.
+- Código: C# 12, nullable enabled, clases pequeñas y servicios inyectables.
+- UI: Blazor simple, sin librerías externas, sin CSS frameworks.
+- Debe compilar y ejecutar con dotnet run.
+- Si faltan detalles, implementar heurísticas razonables y dejar TODO comentado donde sea dudoso.
+- No inventar rutas: usar /Models, /Services, /Pages.
