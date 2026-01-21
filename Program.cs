@@ -33,18 +33,28 @@ app.UseRouting();
 
 app.MapBlazorHub();
 
-// 1) Endpoint ANTES del fallback
 app.MapPost("/api/process", async (
-    [FromForm] IFormFile file,
+    HttpRequest request,
     PriceProfileStore profileStore,
-    ExcelOfferService excelService,
-    string? profileId,
-    int? sequence) =>
+    ExcelOfferService excelService) =>
 {
-    Console.WriteLine($"DEBUG (Program.cs): Received request to /api/process.");
-    Console.WriteLine($"DEBUG (Program.cs): profileId received: '{profileId ?? "(null)"}', sequence received: '{sequence ?? 0}'");
+    Console.WriteLine("DEBUG (Program.cs): Received request to /api/process.");
 
-    int effectiveSequence = sequence ?? 1;
+    if (!request.HasFormContentType)
+        return Results.BadRequest("Request must be multipart/form-data.");
+
+    var form = await request.ReadFormAsync();
+
+    var file = form.Files.GetFile("file");
+    var profileId = form["profileId"].ToString();
+    var sequenceStr = form["sequence"].ToString();
+
+    Console.WriteLine($"DEBUG (Program.cs): profileId received: '{(string.IsNullOrWhiteSpace(profileId) ? "(null/empty)" : profileId)}', sequence received: '{sequenceStr}'");
+
+    var effectiveSequence = 1;
+    if (!string.IsNullOrWhiteSpace(sequenceStr) && int.TryParse(sequenceStr, out var seq) && seq > 0)
+        effectiveSequence = seq;
+
     if (file is null || file.Length == 0)
         return Results.BadRequest("No file uploaded.");
 
@@ -53,15 +63,14 @@ app.MapPost("/api/process", async (
     {
         Console.WriteLine($"DEBUG (Program.cs): Attempting to load profile with ID: '{profileId}'");
         priceProfile = await profileStore.GetAsync(profileId);
+
         if (priceProfile is null)
         {
             Console.WriteLine($"DEBUG (Program.cs): PriceProfile with ID '{profileId}' NOT found.");
             return Results.NotFound($"PriceProfile with ID {profileId} not found.");
         }
-        else
-        {
-            Console.WriteLine($"DEBUG (Program.cs): PriceProfile with ID '{profileId}' loaded successfully. Name: '{priceProfile.Name}'");
-        }
+
+        Console.WriteLine($"DEBUG (Program.cs): PriceProfile loaded. Name: '{priceProfile.Name}'");
     }
 
     byte[] fileBytes;
@@ -86,7 +95,6 @@ app.MapPost("/api/process", async (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         outputFileName);
 });
-
 // 2) Fallback SIEMPRE lo último
 app.MapFallbackToPage("/_Host");
 

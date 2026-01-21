@@ -5,7 +5,6 @@
 <PageTitle>Procesar Oferta</PageTitle>
 
 <h1>Procesar Oferta Excel</h1>
-
 <form method="post" enctype="multipart/form-data" action="/api/process">
     <div class="form-group">
         <label for="file">Archivo Excel (.xlsx):</label>
@@ -14,7 +13,7 @@
 
     <div class="form-group mt-3">
         <label for="profileId">Perfil de Precios:</label>
-        <select id="profileId" @onchange="UpdateProfileId" class="form-control">
+        <select id="profileId" name="profileId" class="form-control">
             <option value="">-- Seleccione un perfil --</option>
             @foreach (var profile in Profiles)
             {
@@ -25,29 +24,17 @@
 
     <div class="form-group mt-3">
         <label for="sequence">Secuencia Diaria:</label>
-        <InputNumber id="sequence" name="sequence" @bind-Value="sequence" class="form-control" min="1" />
+        <input type="number" id="sequence" name="sequence" value="1" min="1" class="form-control" />
     </div>
 
     <button type="submit" class="btn btn-primary mt-4">Procesar y descargar</button>
-
-    <input type="hidden" name="profileId" value="@hiddenProfileId" />
-    <input type="hidden" name="sequence" value="@sequence" />
 </form>
 
 @code {
-    private List<Ofertum.Renovaciones.Models.PriceProfile> Profiles { get; set; } = new List<Ofertum.Renovaciones.Models.PriceProfile>();
-    private string? selectedProfileId { get; set; }
-    private string? hiddenProfileId { get; set; }
-    private int sequence { get; set; } = 1;
+    private List<Ofertum.Renovaciones.Models.PriceProfile> Profiles { get; set; } = new();
 
     protected override async Task OnInitializedAsync()
     {
         Profiles = await PriceProfileStore.ListAsync();
-    }
-
-    private void UpdateProfileId(ChangeEventArgs e)
-    {
-        hiddenProfileId = e.Value?.ToString();
-        selectedProfileId = e.Value?.ToString();
     }
 }

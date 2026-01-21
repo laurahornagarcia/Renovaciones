@@ -24,6 +24,7 @@ C:\LHG\Ofertum.Renovaciones\obj\Debug\net7.0\Ofertum.Renovaciones.csproj.CoreCom
 C:\LHG\Ofertum.Renovaciones\obj\Debug\net7.0\Ofertum.Renovaciones.MvcApplicationPartsAssemblyInfo.cache
 C:\LHG\Ofertum.Renovaciones\obj\Debug\net7.0\Ofertum.Renovaciones.RazorAssemblyInfo.cache
 C:\LHG\Ofertum.Renovaciones\obj\Debug\net7.0\Ofertum.Renovaciones.RazorAssemblyInfo.cs
+C:\LHG\Ofertum.Renovaciones\obj\Debug\net7.0\Ofertum.Renovaciones.sourcelink.json
 C:\LHG\Ofertum.Renovaciones\obj\Debug\net7.0\staticwebassets.build.json
 C:\LHG\Ofertum.Renovaciones\obj\Debug\net7.0\staticwebassets.development.json
 C:\LHG\Ofertum.Renovaciones\obj\Debug\net7.0\staticwebassets\msbuild.Ofertum.Renovaciones.Microsoft.AspNetCore.StaticWebAssets.props
