@@ -113,7 +113,6 @@ else
                 }
                 else if (cellText.Contains("F. Ppto.", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Fecha real (mantiene formato de celda y evita texto)
                     SetDateKeepStyle(cell.CellRight(), todayLocal);
                 }
                 else if (cellText.Contains("Validez", StringComparison.OrdinalIgnoreCase))
@@ -123,16 +122,12 @@ else
             }
         }
 
-        // ------------------ Vigencia D20:D40 (solo fechas) ------------------
-
         private static void UpdateVigenciaInColumnD(IXLWorksheet worksheet, CultureInfo cultureInfo)
         {
-            // Detecta pares: dd-MM-yyyy al dd-MM-yyyy  o  dd/MM/yyyy al dd/MM/yyyy
-            var datePairRegex = new Regex(
-                @"(\d{2})([-/])(\d{2})\2(\d{4})\s*al\s*(\d{2})([-/])(\d{2})\6(\d{4})",
-                RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-            var formats = new[] { "dd-MM-yyyy", "dd/MM/yyyy" };
+            // Detecta cualquier fecha dd-MM-yyyy / d-M-yyyy / dd/MM/yyyy / d/M/yyyy
+            var dateRegex = new Regex(
+                @"\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b",
+                RegexOptions.Compiled);
 
             for (int row = 20; row <= 40; row++)
             {
@@ -142,29 +137,40 @@ else
                 if (string.IsNullOrWhiteSpace(text))
                     continue;
 
-                if (!text.Contains("Vigencia", StringComparison.OrdinalIgnoreCase))
+                // Encuentra todas las fechas de la celda
+                var matches = dateRegex.Matches(text);
+                if (matches.Count < 2)
                     continue;
 
-                // Reemplaza TODAS las coincidencias dentro de la celda (por si hay varias líneas)
-                var replaced = datePairRegex.Replace(text, m =>
+                // Reemplazamos SOLO las dos primeras fechas (inicio y fin)
+                var replaced = text;
+                int replacedCount = 0;
+
+                replaced = dateRegex.Replace(text, m =>
                 {
-                    var sep1 = m.Groups[2].Value;
-                    var sep2 = m.Groups[6].Value;
-
-                    var d1 = $"{m.Groups[1].Value}{sep1}{m.Groups[3].Value}{sep1}{m.Groups[4].Value}";
-                    var d2 = $"{m.Groups[5].Value}{sep2}{m.Groups[7].Value}{sep2}{m.Groups[8].Value}";
-
-                    if (!DateTime.TryParseExact(d1, formats, cultureInfo, DateTimeStyles.None, out var start))
+                    if (replacedCount >= 2)
                         return m.Value;
 
-                    if (!DateTime.TryParseExact(d2, formats, cultureInfo, DateTimeStyles.None, out var end))
-                        return m.Value;
+                    replacedCount++;
 
-                    var newStart = start.AddYears(1).ToString($"dd{sep1}MM{sep1}yyyy", cultureInfo);
-                    var newEnd = end.AddYears(1).ToString($"dd{sep2}MM{sep2}yyyy", cultureInfo);
+                    var raw = m.Value;
+                    var sep = raw.Contains('-') ? "-" : "/";
+                    var formats = new[]
+                    {
+                        $"d{sep}M{sep}yyyy",
+                        $"dd{sep}MM{sep}yyyy"
+                    };
 
-                    // Devuelve SOLO el tramo "fecha al fecha"
-                    return $"{newStart} al {newEnd}";
+                    if (!DateTime.TryParseExact(raw, formats, cultureInfo, DateTimeStyles.None, out var date))
+                        return raw;
+
+                    // Mantén el formato original (con o sin ceros)
+                    bool hasLeadingZeros = raw.StartsWith("0") || raw.Contains($"{sep}0");
+                    var formatOut = hasLeadingZeros
+                        ? $"dd{sep}MM{sep}yyyy"
+                        : $"d{sep}M{sep}yyyy";
+
+                    return date.AddYears(1).ToString(formatOut, cultureInfo);
                 });
 
                 if (!string.Equals(text, replaced, StringComparison.Ordinal))
@@ -174,92 +180,94 @@ else
             }
         }
 
-        // ------------------ Precios bajo LICENCIAS ------------------
 
-        private static void ReplacePricesUnderLicencias(IXLWorksheet worksheet, PriceProfile? profile)
-        {
-            if (profile?.Prices == null || profile.Prices.Count == 0)
-                return;
 
-            var licensesCell = worksheet.CellsUsed()
-                .FirstOrDefault(c => c.GetString().Contains("LICENCIAS", StringComparison.OrdinalIgnoreCase));
+            // ------------------ Precios bajo LICENCIAS ------------------
 
-            if (licensesCell == null)
-                return;
-
-            // Mapa normalizado para que coincida aunque el JSON tenga "401" y la celda "401,00 €"
-            var normalizedMap = profile.Prices
-                .GroupBy(kv => NormalizePriceKey(kv.Key))
-                .ToDictionary(g => g.Key, g => g.Last().Value);
-
-            int startRow = Math.Max(licensesCell.WorksheetRow().RowNumber() + 1, 20);
-            int endRow = 40;
-
-            for (int row = startRow; row <= endRow; row++)
+            private static void ReplacePricesUnderLicencias(IXLWorksheet worksheet, PriceProfile? profile)
             {
-                var cellF = worksheet.Cell(row, "F");
+                if (profile?.Prices == null || profile.Prices.Count == 0)
+                    return;
 
-                // Lo que ve el usuario (mejor para matching)
-                var raw = cellF.GetFormattedString();
-                if (string.IsNullOrWhiteSpace(raw))
-                    continue;
+                var licensesCell = worksheet.CellsUsed()
+                    .FirstOrDefault(c => c.GetString().Contains("LICENCIAS", StringComparison.OrdinalIgnoreCase));
 
-                var key = NormalizePriceKey(raw);
+                if (licensesCell == null)
+                    return;
 
-                if (normalizedMap.TryGetValue(key, out var newPrice) && !string.IsNullOrWhiteSpace(newPrice))
+                // Mapa normalizado para que coincida aunque el JSON tenga "401" y la celda "401,00 €"
+                var normalizedMap = profile.Prices
+                    .GroupBy(kv => NormalizePriceKey(kv.Key))
+                    .ToDictionary(g => g.Key, g => g.Last().Value);
+
+                int startRow = Math.Max(licensesCell.WorksheetRow().RowNumber() + 1, 20);
+                int endRow = 40;
+
+                for (int row = startRow; row <= endRow; row++)
                 {
-                    SetPriceKeepStyle(cellF, newPrice);
+                    var cellF = worksheet.Cell(row, "F");
+
+                    // Lo que ve el usuario (mejor para matching)
+                    var raw = cellF.GetFormattedString();
+                    if (string.IsNullOrWhiteSpace(raw))
+                        continue;
+
+                    var key = NormalizePriceKey(raw);
+
+                    if (normalizedMap.TryGetValue(key, out var newPrice) && !string.IsNullOrWhiteSpace(newPrice))
+                    {
+                        SetPriceKeepStyle(cellF, newPrice);
+                    }
                 }
             }
-        }
 
-        // ------------------ Helpers: mantener formato ------------------
+            // ------------------ Helpers: mantener formato ------------------
 
-        private static void SetTextKeepStyle(IXLCell cell, string text)
-        {
-            var style = cell.Style;
-            cell.Value = text;
-            cell.Style = style;
-        }
-
-        private static void SetDateKeepStyle(IXLCell cell, DateTime date)
-        {
-            var style = cell.Style;
-            var format = cell.Style.DateFormat.Format;
-
-            cell.Value = date.Date;
-
-            // restaura el estilo general
-            cell.Style = style;
-
-            // asegura formato fecha
-            if (string.IsNullOrWhiteSpace(format))
-                cell.Style.DateFormat.Format = "dd/MM/yyyy";
-            else
-                cell.Style.DateFormat.Format = format;
-        }
-
-        private static void SetPriceKeepStyle(IXLCell cell, string newPrice)
-        {
-            var style = cell.Style;
-            var numberFormat = cell.Style.NumberFormat.Format;
-
-            var cleaned = (newPrice ?? "").Replace("€", "").Trim();
-
-            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.GetCultureInfo("es-ES"), out var dec) ||
-                decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out dec))
+            private static void SetTextKeepStyle(IXLCell cell, string text)
             {
-                cell.Value = dec;
-                cell.Style = style;
-
-                if (!string.IsNullOrWhiteSpace(numberFormat))
-                    cell.Style.NumberFormat.Format = numberFormat;
-            }
-            else
-            {
-                cell.Value = newPrice;
+                var style = cell.Style;
+                cell.Value = text;
                 cell.Style = style;
             }
+
+            private static void SetDateKeepStyle(IXLCell cell, DateTime date)
+            {
+                var style = cell.Style;
+                var format = cell.Style.DateFormat.Format;
+
+                cell.Value = date.Date;
+
+                // restaura el estilo general
+                cell.Style = style;
+
+                // asegura formato fecha
+                if (string.IsNullOrWhiteSpace(format))
+                    cell.Style.DateFormat.Format = "dd/MM/yyyy";
+                else
+                    cell.Style.DateFormat.Format = format;
+            }
+
+            private static void SetPriceKeepStyle(IXLCell cell, string newPrice)
+            {
+                var style = cell.Style;
+                var numberFormat = cell.Style.NumberFormat.Format;
+
+                var cleaned = (newPrice ?? "").Replace("€", "").Trim();
+
+                if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.GetCultureInfo("es-ES"), out var dec) ||
+                    decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out dec))
+                {
+                    cell.Value = dec;
+                    cell.Style = style;
+
+                    if (!string.IsNullOrWhiteSpace(numberFormat))
+                        cell.Style.NumberFormat.Format = numberFormat;
+                }
+                else
+                {
+                    cell.Value = newPrice;
+                    cell.Style = style;
+                }
         }
 
         private static string NormalizePriceKey(string input)

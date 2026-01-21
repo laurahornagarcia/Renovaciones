@@ -12,14 +12,17 @@
     </div>
 
     <div class="form-group mt-3">
-        <label for="profileId">Perfil de Precios:</label>
+ 
+
         <select id="profileId" name="profileId" class="form-control">
-            <option value="">-- Seleccione un perfil --</option>
-            @foreach (var profile in Profiles)
-            {
-                <option value="@profile.Id">@profile.Name</option>
-            }
-        </select>
+    <option value="">-- Seleccione un perfil --</option>
+        @foreach (var profile in Profiles)
+        {
+            <option value="@profile.Id" selected="@(profile.Id == selectedProfileId)">
+                @profile.Name
+            </option>
+        }
+    </select>
     </div>
 
     <div class="form-group mt-3">
@@ -32,9 +35,15 @@
 
 @code {
     private List<Ofertum.Renovaciones.Models.PriceProfile> Profiles { get; set; } = new();
-
+    private string? selectedProfileId;
+ 
     protected override async Task OnInitializedAsync()
-    {
-        Profiles = await PriceProfileStore.ListAsync();
-    }
+{
+    Profiles = (await PriceProfileStore.ListAsync())
+        .OrderByDescending(p => p.UpdatedAtUtc)
+        .ToList();
+
+    selectedProfileId = Profiles.FirstOrDefault()?.Id; // el más nuevo
+}
+
 }

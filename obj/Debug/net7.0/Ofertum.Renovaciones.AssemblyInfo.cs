@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Ofertum.Renovaciones")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4f37fc9e8578b6c04fc8e7d702311217d5f0cb05")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9fd1077781eb51a724e7fdbd9eebd0159f19037e")]
 [assembly: System.Reflection.AssemblyProductAttribute("Ofertum.Renovaciones")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Ofertum.Renovaciones")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
